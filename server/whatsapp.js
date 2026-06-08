@@ -118,7 +118,10 @@ async function sendMessage(phone, message) {
   const chatId = formatPhone(phone);
 
   try {
-    const result = await wac.sendMessage(chatId, message);
+    // getNumberId возвращает актуальный ID с LID если нужно
+    const numberId = await wac.getNumberId(chatId.replace('@c.us', ''));
+    const resolvedId = numberId ? numberId._serialized : chatId;
+    const result = await wac.sendMessage(resolvedId, message);
     console.log(`[WhatsApp] Отправлено на ${phone}: ${result.id._serialized}`);
     return result;
   } catch (err) {
