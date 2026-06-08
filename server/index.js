@@ -35,17 +35,30 @@ app.use('/api/', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.post('/api/payments/webhook', paymentRoutes);
 
-// Public payment page route
-app.get('/api/pay/:clientId', (req, res) => {
-  const db = getDb();
-  const client = db.prepare('SELECT id, name, phone, subscription_end, status FROM clients WHERE id = ?').get(req.params.clientId);
-  if (!client) return res.status(404).json({ error: 'Клиент не найден' });
-  res.json({
-    name: client.name,
-    status: client.status,
-    subscription_end: client.subscription_end,
-    price: process.env.SUBSCRIPTION_PRICE || '250',
-  });
+// Public payment page route — JWT токен бессрочный
+app.get('/api/pay/:token', async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const { dbGet: _dbGet } = require('./db');
+    const { getSetting } = require('./routes/settings');
+    const secret = process.env.JWT_SECRET || 'secret';
+    let payload;
+    try {
+      payload = jwt.verify(req.params.token, secret);
+    } catch {
+      return res.status(400).json({ error: 'Ссылка недействительна' });
+    }
+    if (payload.type !== 'pay') return res.status(400).json({ error: 'Неверный тип токена' });
+    const client = await _dbGet('SELECT id, name, phone, subscription_end FROM clients WHERE id = ?', [payload.client_id]);
+    if (!client) return res.status(404).json({ error: 'Клиент не найден' });
+    const price = await getSetting('subscription_price') || '250';
+    const sbpPhone = await getSetting('sbp_phone') || '';
+    const sbpBank = await getSetting('sbp_bank') || '';
+    const sbpName = await getSetting('sbp_name') || '';
+    res.json({ client, price, sbpPhone, sbpBank, sbpName });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Protected routes
@@ -122,32 +135,6 @@ app.post('/api/admin/send-message', requireAuth, async (req, res) => {
     if (!client.phone) return res.status(400).json({ error: 'У клиента нет номера телефона' });
     await sendMessage(client.phone, message);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Публичная страница оплаты — получить данные клиента по pay-токену (без авторизации)
-app.get('/api/pay/:token', async (req, res) => {
-  try {
-    const jwt = require('jsonwebtoken');
-    const { dbGet: _dbGet } = require('./db');
-    const secret = process.env.JWT_SECRET || 'secret';
-    let payload;
-    try {
-      payload = jwt.verify(req.params.token, secret);
-    } catch {
-      return res.status(400).json({ error: 'Ссылка недействительна' });
-    }
-    if (payload.type !== 'pay') return res.status(400).json({ error: 'Неверный тип токена' });
-    const client = await _dbGet('SELECT id, name, phone, subscription_end FROM clients WHERE id = ?', [payload.client_id]);
-    if (!client) return res.status(404).json({ error: 'Клиент не найден' });
-    const { getSetting } = require('./routes/settings');
-    const price = await getSetting('subscription_price') || '250';
-    const sbpPhone = await getSetting('sbp_phone') || '';
-    const sbpBank = await getSetting('sbp_bank') || '';
-    const sbpName = await getSetting('sbp_name') || '';
-    res.json({ client, price, sbpPhone, sbpBank, sbpName });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
