@@ -55,6 +55,16 @@ echo -e "${GREEN}Зависимости установлены${NC}"
 mkdir -p data/wwebjs_auth
 chmod 755 data
 
+# ─── Запрос домена заранее (нужен и для .env и для nginx/SSL) ────────────────
+if [ -f .env ]; then
+  DOMAIN=$(grep '^APP_URL=' .env | sed 's|^APP_URL=https\?://||' | cut -d/ -f1)
+fi
+if [ -z "$DOMAIN" ]; then
+  echo ""
+  read -p "  Введите домен сервиса (например adams.byred.fun): " DOMAIN
+  DOMAIN=$(echo "$DOMAIN" | sed 's|https\?://||' | tr -d '/')
+fi
+
 # ─── Настройка .env ──────────────────────────────────────────────────────────
 echo -e "\n${YELLOW}[4/6] Настройка окружения...${NC}"
 
@@ -64,7 +74,8 @@ else
   echo "Заполните параметры (Enter = оставить пустым):"
   echo ""
 
-  read -p "  URL сервиса (например https://adams.byred.fun): " APP_URL
+  APP_URL="https://${DOMAIN}"
+  echo "  URL сервиса: ${APP_URL}"
   read -p "  Логин администратора [admin]: " ADMIN_USERNAME
   ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
   read -s -p "  Пароль администратора: " ADMIN_PASSWORD
@@ -131,19 +142,20 @@ pm2 save 2>/dev/null
 pm2 startup 2>/dev/null | tail -1 | bash 2>/dev/null || true
 echo -e "${GREEN}PM2 настроен, приложение запущено${NC}"
 
-# ─── Nginx (опционально) ─────────────────────────────────────────────────────
-echo -e "\n${YELLOW}[6/6] Настройка Nginx...${NC}"
-if command -v nginx &>/dev/null || apt-get install -y -qq nginx 2>/dev/null; then
-  # Читаем PORT из .env
-  APP_PORT=$(grep '^PORT=' .env | cut -d= -f2)
-  APP_PORT=${APP_PORT:-3000}
-  DOMAIN=$(grep '^APP_URL=' .env | sed 's|^APP_URL=https\?://||' | cut -d/ -f1)
-  DOMAIN=${DOMAIN:-_}
+# ─── Nginx + SSL ─────────────────────────────────────────────────────────────
+echo -e "\n${YELLOW}[6/6] Настройка Nginx и SSL...${NC}"
 
-  cat > /etc/nginx/sites-available/wg-manager <<EOF
+apt-get install -y -qq nginx certbot python3-certbot-nginx 2>/dev/null
+
+APP_PORT=$(grep '^PORT=' .env | cut -d= -f2)
+APP_PORT=${APP_PORT:-3000}
+DOMAIN_NGINX=${DOMAIN:-_}
+
+# HTTP конфиг (certbot потом добавит HTTPS)
+cat > /etc/nginx/sites-available/wg-manager <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN};
+    server_name ${DOMAIN_NGINX};
 
     client_max_body_size 10M;
 
@@ -162,22 +174,30 @@ server {
 }
 EOF
 
-  ln -sf /etc/nginx/sites-available/wg-manager /etc/nginx/sites-enabled/wg-manager 2>/dev/null || true
-  rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
-  nginx -t 2>/dev/null && systemctl reload nginx 2>/dev/null || true
-  echo -e "${GREEN}Nginx настроен для домена: ${DOMAIN}${NC}"
+ln -sf /etc/nginx/sites-available/wg-manager /etc/nginx/sites-enabled/wg-manager
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+nginx -t && systemctl reload nginx
+echo -e "${GREEN}Nginx настроен${NC}"
 
-  # Certbot SSL
-  if [ "$DOMAIN" != "_" ] && [ -n "$DOMAIN" ]; then
-    read -p "Получить SSL сертификат для ${DOMAIN}? (y/N): " GET_SSL
-    if [[ "$GET_SSL" =~ ^[Yy]$ ]]; then
-      apt-get install -y -qq certbot python3-certbot-nginx 2>/dev/null
-      certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "admin@${DOMAIN}" || \
-        echo -e "${YELLOW}SSL не удалось получить — настройте вручную: certbot --nginx -d ${DOMAIN}${NC}"
-    fi
+# SSL через Certbot
+if [ "$DOMAIN_NGINX" != "_" ] && [ -n "$DOMAIN_NGINX" ]; then
+  echo -e "${YELLOW}Получаю SSL сертификат для ${DOMAIN_NGINX}...${NC}"
+  echo -e "${YELLOW}(Убедитесь что DNS запись A уже указывает на этот сервер!)${NC}"
+
+  # Пытаемся без email (--register-unsafely-without-email), если не выйдет — с email
+  if certbot --nginx -d "$DOMAIN_NGINX" --non-interactive --agree-tos \
+       --register-unsafely-without-email 2>/dev/null; then
+    echo -e "${GREEN}SSL сертификат получен!${NC}"
+    # Автообновление
+    (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet") | sort -u | crontab -
+    echo -e "${GREEN}Автообновление сертификата настроено${NC}"
+  else
+    echo -e "${YELLOW}⚠  Не удалось получить SSL автоматически.${NC}"
+    echo -e "   Получите вручную после установки:"
+    echo -e "   ${BLUE}certbot --nginx -d ${DOMAIN_NGINX}${NC}"
   fi
 else
-  echo -e "${YELLOW}Nginx не установлен, пропускаю${NC}"
+  echo -e "${YELLOW}Домен не указан — SSL пропущен${NC}"
 fi
 
 # ─── Итог ────────────────────────────────────────────────────────────────────
