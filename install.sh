@@ -33,7 +33,7 @@ apt-get install -y -qq curl wget git ca-certificates gnupg lsb-release \
   libgdk-pixbuf2.0-0 libgtk-3-0 libnspr4 libnss3 \
   libx11-xcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
   libxrandr2 libxrender1 libxss1 libxtst6 \
-  libasound2 libpango-1.0-0 libpangocairo-1.0-0 \
+  libasound2t64 libpango-1.0-0 libpangocairo-1.0-0 \
   libgbm1 libxshmfence1 libglib2.0-0 \
   fonts-liberation xdg-utils ca-certificates 2>/dev/null || true
 
