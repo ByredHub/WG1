@@ -29,10 +29,13 @@ echo -e "${GREEN}▶ Рабочая директория: $SCRIPT_DIR${NC}"
 echo -e "\n${YELLOW}[1/6] Установка системных зависимостей...${NC}"
 apt-get update -qq
 apt-get install -y -qq curl wget git ca-certificates gnupg lsb-release \
-  chromium-browser fonts-liberation libappindicator3-1 libasound2 \
-  libatk-bridge2.0-0 libatk1.0-0 libcups2 libdbus-1-3 libgdk-pixbuf2.0-0 \
-  libnspr4 libnss3 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 \
-  xdg-utils libgbm1 libxshmfence1 2>/dev/null || true
+  libatk1.0-0 libatk-bridge2.0-0 libcups2 libdbus-1-3 \
+  libgdk-pixbuf2.0-0 libgtk-3-0 libnspr4 libnss3 \
+  libx11-xcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
+  libxrandr2 libxrender1 libxss1 libxtst6 \
+  libasound2 libpango-1.0-0 libpangocairo-1.0-0 \
+  libgbm1 libxshmfence1 libglib2.0-0 \
+  fonts-liberation xdg-utils ca-certificates 2>/dev/null || true
 
 # ─── Установка Node.js 20 ────────────────────────────────────────────────────
 echo -e "\n${YELLOW}[2/6] Проверка Node.js...${NC}"
