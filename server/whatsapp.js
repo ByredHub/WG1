@@ -68,6 +68,10 @@ function getClient() {
 
   client.initialize().catch(err => {
     console.error('[WhatsApp] Ошибка инициализации:', err.message);
+    isReady = false;
+    lastQR = null;
+    client = null;
+    qrCallbacks.forEach(cb => cb({ type: 'disconnected', reason: err.message }));
   });
 
   return client;

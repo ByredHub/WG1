@@ -41,7 +41,11 @@ export default function WhatsAppConnect() {
       if (data.type === 'disconnected') { setPhase('waiting_qr'); setStatus({ ready: false, initialized: false }); setQr(null) }
       if (data.type === 'auth_failure') setPhase('error')
     }
-    es.onerror = () => setPhase('error')
+    es.onerror = () => {
+      es.close()
+      // Переподключаемся через 4 сек — Chrome мог ещё не запуститься
+      setTimeout(() => startStream(), 4000)
+    }
   }
 
   async function handleRestart() {
