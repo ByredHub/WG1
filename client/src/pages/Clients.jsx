@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api.js'
 import dayjs from 'dayjs'
-import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check } from 'lucide-react'
+import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2 } from 'lucide-react'
 import AddClientModal from '../components/AddClientModal.jsx'
 
 function StatusBadge({ status, subscriptionEnd }) {
@@ -39,10 +39,15 @@ export default function Clients() {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [saving, setSaving] = useState(false)
+  const [peers, setPeers] = useState([])
 
   useEffect(() => {
     loadClients()
   }, [statusFilter])
+
+  useEffect(() => {
+    api.get('/clients/wg/peers').then(res => setPeers(res.data)).catch(() => {})
+  }, [])
 
   async function loadClients() {
     setLoading(true)
@@ -64,6 +69,18 @@ export default function Clients() {
     loadClients()
   }
 
+  async function handleDelete(clientId, clientName, e) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!confirm(`Удалить клиента «${clientName}»?`)) return
+    try {
+      await api.delete(`/clients/${clientId}`)
+      await loadClients()
+    } catch (err) {
+      alert('Ошибка: ' + (err.response?.data?.error || err.message))
+    }
+  }
+
   function startEdit(client, e) {
     e.preventDefault()
     e.stopPropagation()
@@ -72,6 +89,8 @@ export default function Clients() {
       name: client.name,
       phone: client.phone || '',
       subscription_end: client.subscription_end || '',
+      wg_peer_id: client.wg_peer_id || '',
+      wg_peer_name: client.wg_peer_name || '',
     })
   }
 
@@ -213,9 +232,26 @@ export default function Clients() {
                       )}
                     </td>
 
-                    {/* WG пир — только просмотр */}
+                    {/* WG пир */}
                     <td className="px-4 py-2.5 text-gray-500 text-sm font-mono">
-                      {client.wg_peer_name || <span className="text-gray-300">—</span>}
+                      {isEditing ? (
+                        <select
+                          value={editForm.wg_peer_id}
+                          onChange={e => {
+                            const p = peers.find(p => p.id === e.target.value)
+                            setEditForm(f => ({ ...f, wg_peer_id: e.target.value, wg_peer_name: p ? p.name : '' }))
+                          }}
+                          onClick={ev => ev.stopPropagation()}
+                          className="border border-blue-400 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white max-w-[150px]"
+                        >
+                          <option value="">— не выбран —</option>
+                          {peers.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        client.wg_peer_name || <span className="text-gray-300">—</span>
+                      )}
                     </td>
 
                     {/* Подписка до */}
@@ -260,13 +296,22 @@ export default function Clients() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={e => startEdit(client, e)}
-                          title="Редактировать"
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          <Pencil size={13} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={e => startEdit(client, e)}
+                            title="Редактировать"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={e => handleDelete(client.id, client.name, e)}
+                            title="Удалить"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
