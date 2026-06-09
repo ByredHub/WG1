@@ -5,11 +5,24 @@ const dayjs = require('dayjs');
 const { dbRun, dbGet, dbAll } = require('../db');
 const { getPeers, enablePeer, disablePeer } = require('../wgEasy');
 
-// GET /api/clients/wg/peers — должен быть ДО /:id чтобы не перехватывался
+// GET /api/clients/wg/peers
 router.get('/wg/peers', async (req, res) => {
   try {
     const peers = await getPeers();
     res.json(peers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/clients/wg/peers — создать новый пир в WG Easy
+router.post('/wg/peers', async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Имя пира обязательно' });
+    const { createPeer } = require('../wgEasy');
+    const peer = await createPeer(name);
+    res.status(201).json(peer);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

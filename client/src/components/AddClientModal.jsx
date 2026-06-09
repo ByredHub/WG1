@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import api from '../api.js'
-import { X, Wifi } from 'lucide-react'
+import { X, Wifi, PlusCircle } from 'lucide-react'
 
 export default function AddClientModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
@@ -14,10 +14,31 @@ export default function AddClientModal({ onClose, onCreated }) {
   const [peers, setPeers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showNewPeer, setShowNewPeer] = useState(false)
+  const [newPeerName, setNewPeerName] = useState('')
+  const [creatingPeer, setCreatingPeer] = useState(false)
 
   useEffect(() => {
     api.get('/clients/wg/peers').then(res => setPeers(res.data)).catch(() => {})
   }, [])
+
+  async function handleCreatePeer() {
+    if (!newPeerName.trim()) return
+    setCreatingPeer(true)
+    try {
+      const res = await api.post('/clients/wg/peers', { name: newPeerName.trim() })
+      const peer = res.data
+      const updated = await api.get('/clients/wg/peers')
+      setPeers(updated.data)
+      set('wg_peer_id', peer.id)
+      setNewPeerName('')
+      setShowNewPeer(false)
+    } catch (err) {
+      setError('Ошибка создания пира: ' + (err.response?.data?.error || err.message))
+    } finally {
+      setCreatingPeer(false)
+    }
+  }
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -86,9 +107,19 @@ export default function AddClientModal({ onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <span className="flex items-center gap-1.5"><Wifi size={13} /> WireGuard пир</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium text-gray-700">
+                <span className="flex items-center gap-1.5"><Wifi size={13} /> WireGuard пир</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowNewPeer(v => !v)}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <PlusCircle size={13} />
+                Создать новый
+              </button>
+            </div>
             <select
               value={form.wg_peer_id}
               onChange={e => set('wg_peer_id', e.target.value)}
@@ -101,7 +132,27 @@ export default function AddClientModal({ onClose, onCreated }) {
                 </option>
               ))}
             </select>
-            {peers.length === 0 && (
+            {showNewPeer && (
+              <div className="mt-2 flex gap-2">
+                <input
+                  autoFocus
+                  value={newPeerName}
+                  onChange={e => setNewPeerName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreatePeer() } if (e.key === 'Escape') setShowNewPeer(false) }}
+                  placeholder="Имя нового пира"
+                  className="flex-1 border border-green-400 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreatePeer}
+                  disabled={creatingPeer || !newPeerName.trim()}
+                  className="px-3 py-1.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  {creatingPeer ? '...' : 'Создать'}
+                </button>
+              </div>
+            )}
+            {peers.length === 0 && !showNewPeer && (
               <p className="text-xs text-gray-400 mt-1">Нет подключения к WG Easy или пиров нет</p>
             )}
           </div>

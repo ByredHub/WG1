@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../api.js'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
-import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2, Download } from 'lucide-react'
+import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2, Download, PlusCircle } from 'lucide-react'
 import AddClientModal from '../components/AddClientModal.jsx'
 
 function StatusBadge({ status, subscriptionEnd }) {
@@ -41,14 +41,38 @@ export default function Clients() {
   const [editForm, setEditForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [peers, setPeers] = useState([])
+  const [creatingPeer, setCreatingPeer] = useState(false)
+  const [newPeerName, setNewPeerName] = useState('')
+  const [showNewPeer, setShowNewPeer] = useState(false)
 
   useEffect(() => {
     loadClients()
   }, [statusFilter])
 
   useEffect(() => {
-    api.get('/clients/wg/peers').then(res => setPeers(res.data)).catch(() => {})
+    loadPeers()
   }, [])
+
+  async function loadPeers() {
+    api.get('/clients/wg/peers').then(res => setPeers(res.data)).catch(() => {})
+  }
+
+  async function handleCreatePeer(onCreated) {
+    if (!newPeerName.trim()) return
+    setCreatingPeer(true)
+    try {
+      const res = await api.post('/clients/wg/peers', { name: newPeerName.trim() })
+      const peer = res.data
+      await loadPeers()
+      setNewPeerName('')
+      setShowNewPeer(false)
+      if (onCreated) onCreated(peer)
+    } catch (err) {
+      alert('Ошибка создания пира: ' + (err.response?.data?.error || err.message))
+    } finally {
+      setCreatingPeer(false)
+    }
+  }
 
   async function loadClients() {
     setLoading(true)
@@ -275,24 +299,58 @@ export default function Clients() {
                     </td>
 
                     {/* WG пир */}
-                    <td className="px-4 py-2.5 text-gray-500 text-sm font-mono">
+                    <td className="px-4 py-2.5 text-gray-500 text-sm">
                       {isEditing ? (
-                        <select
-                          value={editForm.wg_peer_id}
-                          onChange={e => {
-                            const p = peers.find(p => p.id === e.target.value)
-                            setEditForm(f => ({ ...f, wg_peer_id: e.target.value, wg_peer_name: p ? p.name : '' }))
-                          }}
-                          onClick={ev => ev.stopPropagation()}
-                          className="border border-blue-400 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white max-w-[150px]"
-                        >
-                          <option value="">— не выбран —</option>
-                          {peers.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                          ))}
-                        </select>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <select
+                              value={editForm.wg_peer_id}
+                              onChange={e => {
+                                const p = peers.find(p => p.id === e.target.value)
+                                setEditForm(f => ({ ...f, wg_peer_id: e.target.value, wg_peer_name: p ? p.name : '' }))
+                              }}
+                              onClick={ev => ev.stopPropagation()}
+                              className="border border-blue-400 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white max-w-[130px]"
+                            >
+                              <option value="">— не выбран —</option>
+                              {peers.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={ev => { ev.stopPropagation(); setShowNewPeer(showNewPeer === client.id ? false : client.id) }}
+                              title="Создать новый пир"
+                              className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                            >
+                              <PlusCircle size={15} />
+                            </button>
+                          </div>
+                          {showNewPeer === client.id && (
+                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                              <input
+                                autoFocus
+                                value={newPeerName}
+                                onChange={e => setNewPeerName(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleCreatePeer(peer => setEditForm(f => ({ ...f, wg_peer_id: peer.id, wg_peer_name: peer.name })))
+                                  if (e.key === 'Escape') { setShowNewPeer(false); setNewPeerName('') }
+                                }}
+                                placeholder="Имя пира"
+                                className="border border-green-400 rounded px-2 py-0.5 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-green-400"
+                              />
+                              <button
+                                onClick={() => handleCreatePeer(peer => setEditForm(f => ({ ...f, wg_peer_id: peer.id, wg_peer_name: peer.name })))}
+                                disabled={creatingPeer}
+                                className="text-xs px-2 py-0.5 bg-green-500 hover:bg-green-600 text-white rounded disabled:opacity-50"
+                              >
+                                {creatingPeer ? '...' : 'Создать'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        client.wg_peer_name || <span className="text-gray-300">—</span>
+                        <span className="font-mono">{client.wg_peer_name || <span className="text-gray-300">—</span>}</span>
                       )}
                     </td>
 
