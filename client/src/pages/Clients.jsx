@@ -454,15 +454,26 @@ export default function Clients() {
                             <Pencil size={13} />
                           </button>
                           {client.wg_peer_id && (
-                            <a
-                              href={`/api/clients/wg/peers/${client.wg_peer_id}/config`}
-                              download
-                              onClick={e => e.stopPropagation()}
-                              title="Скачать конфиг WireGuard"
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors inline-flex"
+                            <button
+                              onClick={async e => {
+                                e.stopPropagation()
+                                try {
+                                  const res = await api.get(`/clients/wg/peers/${client.wg_peer_id}/config`, { responseType: 'blob' })
+                                  const url = URL.createObjectURL(new Blob([res.data], { type: 'text/plain' }))
+                                  const a = document.createElement('a')
+                                  a.href = url
+                                  a.download = `${(client.wg_peer_name || 'peer').replace(/[^a-zA-Z0-9_-]/g, '_')}.conf`
+                                  a.click()
+                                  URL.revokeObjectURL(url)
+                                } catch (err) {
+                                  alert('Ошибка скачивания: ' + (err.response?.data?.error || err.message))
+                                }
+                              }}
+                              title="Скачать конфиг WireGuard (.conf)"
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                             >
                               <FileDown size={13} />
-                            </a>
+                            </button>
                           )}
                           <button
                             onClick={e => handleDelete(client.id, client.name, e)}
