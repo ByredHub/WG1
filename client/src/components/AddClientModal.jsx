@@ -7,6 +7,7 @@ export default function AddClientModal({ onClose, onCreated }) {
     name: '',
     phone: '',
     wg_peer_id: '',
+    router_model: '',
     notes: '',
     days: 30,
   })
@@ -31,6 +32,7 @@ export default function AddClientModal({ onClose, onCreated }) {
       await api.post('/clients', {
         ...form,
         wg_peer_name: selectedPeer ? selectedPeer.name : '',
+        router_model: form.router_model || undefined,
       })
       onCreated()
     } catch (err) {
@@ -69,6 +71,16 @@ export default function AddClientModal({ onClose, onCreated }) {
               onChange={e => set('phone', e.target.value)}
               required
               placeholder="+7 900 000 00 00"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Модель роутера</label>
+            <input
+              value={form.router_model}
+              onChange={e => set('router_model', e.target.value)}
+              placeholder="напр. Keenetic Speedster"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

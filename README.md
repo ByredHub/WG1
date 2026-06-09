@@ -91,3 +91,6 @@ npm run import-wg /путь/к/wg0.json
 
 
 
+
+
+echo "ADMIN_PHONE=79280939344" >> /opt/wg-manager/.env

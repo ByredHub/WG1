@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api.js'
 import dayjs from 'dayjs'
-import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2 } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2, Download } from 'lucide-react'
 import AddClientModal from '../components/AddClientModal.jsx'
 
 function StatusBadge({ status, subscriptionEnd }) {
@@ -81,6 +82,22 @@ export default function Clients() {
     }
   }
 
+  function exportToExcel() {
+    const rows = filtered.map(c => ({
+      'Имя': c.name,
+      'Телефон': c.phone || '',
+      'Модель роутера': c.router_model || '',
+      'WG пир': c.wg_peer_name || '',
+      'Подписка до': c.subscription_end ? dayjs(c.subscription_end).format('DD.MM.YYYY') : '',
+      'Статус': c.status === 'active' ? 'Активен' : 'Отключён',
+      'Бесплатный': c.is_free ? 'Да' : 'Нет',
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Клиенты')
+    XLSX.writeFile(wb, `clients_${dayjs().format('YYYY-MM-DD')}.xlsx`)
+  }
+
   function startEdit(client, e) {
     e.preventDefault()
     e.stopPropagation()
@@ -91,6 +108,7 @@ export default function Clients() {
       subscription_end: client.subscription_end || '',
       wg_peer_id: client.wg_peer_id || '',
       wg_peer_name: client.wg_peer_name || '',
+      router_model: client.router_model || '',
     })
   }
 
@@ -128,13 +146,22 @@ export default function Clients() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Клиенты</h1>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          Добавить клиента
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-2 border border-gray-300 hover:border-gray-400 bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Download size={16} />
+            Excel
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Добавить клиента
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -187,6 +214,7 @@ export default function Clients() {
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Клиент</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Телефон</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Роутер</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">WG пир</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Подписка до</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Статус</th>
@@ -229,6 +257,20 @@ export default function Clients() {
                         />
                       ) : (
                         <span className="text-gray-600 text-sm">{client.phone || <span className="text-gray-300">—</span>}</span>
+                      )}
+                    </td>
+
+                    {/* Роутер */}
+                    <td className="px-4 py-2.5">
+                      {isEditing ? (
+                        <InlineEdit
+                          value={editForm.router_model}
+                          onChange={v => setEditForm(f => ({ ...f, router_model: v }))}
+                          className="w-32"
+                          onKeyDown={e => handleKeyDown(e, client.id)}
+                        />
+                      ) : (
+                        <span className="text-gray-600 text-sm">{client.router_model || <span className="text-gray-300">—</span>}</span>
                       )}
                     </td>
 

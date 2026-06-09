@@ -80,7 +80,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/clients
 router.post('/', async (req, res) => {
-  const { name, phone, wg_peer_id, wg_peer_name, notes, days = 30 } = req.body;
+  const { name, phone, wg_peer_id, wg_peer_name, router_model, notes, days = 30 } = req.body;
   if (!name || !phone) return res.status(400).json({ error: 'Имя и телефон обязательны' });
 
   const id = uuidv4();
@@ -88,8 +88,8 @@ router.post('/', async (req, res) => {
 
   try {
     await dbRun(
-      `INSERT INTO clients (id, name, phone, wg_peer_id, wg_peer_name, subscription_end, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, name, phone, wg_peer_id || null, wg_peer_name || null, subscription_end, notes || null]
+      `INSERT INTO clients (id, name, phone, wg_peer_id, wg_peer_name, router_model, subscription_end, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, phone, wg_peer_id || null, wg_peer_name || null, router_model || null, subscription_end, notes || null]
     );
     const client = await dbGet('SELECT * FROM clients WHERE id = ?', [id]);
     res.status(201).json(client);
@@ -104,12 +104,13 @@ router.patch('/:id', async (req, res) => {
     const client = await dbGet('SELECT * FROM clients WHERE id = ?', [req.params.id]);
     if (!client) return res.status(404).json({ error: 'Клиент не найден' });
 
-    const { name, phone, wg_peer_id, wg_peer_name, notes, subscription_end, status, is_free } = req.body;
+    const { name, phone, wg_peer_id, wg_peer_name, router_model, notes, subscription_end, status, is_free } = req.body;
     const u = {
       name: name ?? client.name,
       phone: phone ?? client.phone,
       wg_peer_id: wg_peer_id !== undefined ? wg_peer_id : client.wg_peer_id,
       wg_peer_name: wg_peer_name !== undefined ? wg_peer_name : client.wg_peer_name,
+      router_model: router_model !== undefined ? router_model : client.router_model,
       notes: notes !== undefined ? notes : client.notes,
       subscription_end: subscription_end ?? client.subscription_end,
       status: status ?? client.status,
@@ -117,8 +118,8 @@ router.patch('/:id', async (req, res) => {
     };
 
     await dbRun(
-      `UPDATE clients SET name=?, phone=?, wg_peer_id=?, wg_peer_name=?, notes=?, subscription_end=?, status=?, is_free=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
-      [u.name, u.phone, u.wg_peer_id, u.wg_peer_name, u.notes, u.subscription_end, u.status, u.is_free, client.id]
+      `UPDATE clients SET name=?, phone=?, wg_peer_id=?, wg_peer_name=?, router_model=?, notes=?, subscription_end=?, status=?, is_free=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+      [u.name, u.phone, u.wg_peer_id, u.wg_peer_name, u.router_model, u.notes, u.subscription_end, u.status, u.is_free, client.id]
     );
     res.json(await dbGet('SELECT * FROM clients WHERE id = ?', [client.id]));
   } catch (err) {

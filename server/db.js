@@ -29,6 +29,7 @@ function initSchema() {
       phone TEXT NOT NULL,
       wg_peer_id TEXT,
       wg_peer_name TEXT,
+      router_model TEXT,
       subscription_end DATE,
       status TEXT DEFAULT 'active',
       notes TEXT,
@@ -73,8 +74,10 @@ function initSchema() {
       FOREIGN KEY (client_id) REFERENCES clients(id)
     );
   `, (err) => {
-    if (err) console.error('[DB] Ошибка схемы:', err.message);
-    else console.log('[DB] База данных готова');
+    if (err) { console.error('[DB] Ошибка схемы:', err.message); return; }
+    // Миграции — добавить новые колонки если их нет
+    db.run(`ALTER TABLE clients ADD COLUMN router_model TEXT`, () => {});
+    console.log('[DB] База данных готова');
   });
 }
 
