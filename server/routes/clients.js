@@ -3,13 +3,28 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const dayjs = require('dayjs');
 const { dbRun, dbGet, dbAll } = require('../db');
-const { getPeers, enablePeer, disablePeer } = require('../wgEasy');
+const { getPeers, enablePeer, disablePeer, getPeerConfig } = require('../wgEasy');
 
 // GET /api/clients/wg/peers
 router.get('/wg/peers', async (req, res) => {
   try {
     const peers = await getPeers();
     res.json(peers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/clients/wg/peers/:peerId/config — скачать конфиг пира
+router.get('/wg/peers/:peerId/config', async (req, res) => {
+  try {
+    const config = await getPeerConfig(req.params.peerId);
+    const peers = await getPeers();
+    const peer = peers.find(p => p.id === req.params.peerId);
+    const filename = peer ? `${peer.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.conf` : 'wireguard.conf';
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(config);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

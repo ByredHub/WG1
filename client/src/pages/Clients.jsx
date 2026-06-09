@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../api.js'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
-import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2, Download, PlusCircle, GripVertical } from 'lucide-react'
+import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2, Download, PlusCircle, GripVertical, FileDown } from 'lucide-react'
 import AddClientModal from '../components/AddClientModal.jsx'
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors
@@ -158,6 +158,11 @@ export default function Clients() {
       'Бесплатный': c.is_free ? 'Да' : 'Нет',
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
+    // Автоширина колонок
+    const cols = Object.keys(rows[0] || {}).map(key => ({
+      wch: Math.max(key.length, ...rows.map(r => String(r[key] || '').length)) + 2
+    }))
+    ws['!cols'] = cols
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Клиенты')
     XLSX.writeFile(wb, `clients_${dayjs().format('YYYY-MM-DD')}.xlsx`)
@@ -448,6 +453,17 @@ export default function Clients() {
                           >
                             <Pencil size={13} />
                           </button>
+                          {client.wg_peer_id && (
+                            <a
+                              href={`/api/clients/wg/peers/${client.wg_peer_id}/config`}
+                              download
+                              onClick={e => e.stopPropagation()}
+                              title="Скачать конфиг WireGuard"
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors inline-flex"
+                            >
+                              <FileDown size={13} />
+                            </a>
+                          )}
                           <button
                             onClick={e => handleDelete(client.id, client.name, e)}
                             title="Удалить"
