@@ -3,8 +3,15 @@ import { Link } from 'react-router-dom'
 import api from '../api.js'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
-import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2, Download, PlusCircle } from 'lucide-react'
+import { Plus, Search, CheckCircle, XCircle, Clock, Filter, Gift, Pencil, X, Check, Trash2, Download, PlusCircle, GripVertical } from 'lucide-react'
 import AddClientModal from '../components/AddClientModal.jsx'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, verticalListSortingStrategy, arrayMove
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 function StatusBadge({ status, subscriptionEnd }) {
   const daysLeft = dayjs(subscriptionEnd).diff(dayjs(), 'day')
@@ -15,6 +22,26 @@ function StatusBadge({ status, subscriptionEnd }) {
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"><Clock size={12} />{daysLeft <= 0 ? 'Сегодня' : `${daysLeft} дн.`}</span>
   }
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700"><CheckCircle size={12} />Активен</span>
+}
+
+function SortableRow({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    background: isDragging ? '#eff6ff' : undefined,
+    zIndex: isDragging ? 10 : undefined,
+    position: 'relative',
+  }
+  return (
+    <tr ref={setNodeRef} style={style}>
+      <td className="w-8 px-2 py-2.5 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500" {...attributes} {...listeners}>
+        <GripVertical size={15} />
+      </td>
+      {children}
+    </tr>
+  )
 }
 
 function InlineEdit({ value, onChange, onKeyDown, type = 'text', className = '' }) {
@@ -71,6 +98,20 @@ export default function Clients() {
       alert('Ошибка создания пира: ' + (err.response?.data?.error || err.message))
     } finally {
       setCreatingPeer(false)
+    }
+  }
+
+  async function handleDragEnd(event) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = clients.findIndex(c => c.id === active.id)
+    const newIndex = clients.findIndex(c => c.id === over.id)
+    const newOrder = arrayMove(clients, oldIndex, newIndex)
+    setClients(newOrder)
+    try {
+      await api.patch('/clients/reorder', { ids: newOrder.map(c => c.id) })
+    } catch (err) {
+      console.error('reorder failed', err)
     }
   }
 
@@ -223,6 +264,7 @@ export default function Clients() {
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <DndContext sensors={useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -236,6 +278,7 @@ export default function Clients() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="w-8"></th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Клиент</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Телефон</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Роутер</th>
@@ -245,11 +288,12 @@ export default function Clients() {
                 <th className="px-4 py-3 w-20"></th>
               </tr>
             </thead>
+            <SortableContext items={filtered.map(c => c.id)} strategy={verticalListSortingStrategy}>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(client => {
                 const isEditing = editingId === client.id
                 return (
-                  <tr key={client.id} className={`group transition-colors ${isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                  <SortableRow key={client.id} id={client.id}>
 
                     {/* Имя */}
                     <td className="px-4 py-2.5">
@@ -414,12 +458,14 @@ export default function Clients() {
                         </div>
                       )}
                     </td>
-                  </tr>
+                  </SortableRow>
                 )
               })}
             </tbody>
+            </SortableContext>
           </table>
         )}
+      </DndContext>
       </div>
 
       {showAddModal && (

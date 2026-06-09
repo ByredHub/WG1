@@ -65,10 +65,24 @@ router.get('/', async (req, res) => {
     if (status && status !== 'all') { conditions.push('status = ?'); params.push(status); }
     if (search) { conditions.push('(name LIKE ? OR phone LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
     if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
-    query += ' ORDER BY subscription_end ASC';
+    query += ' ORDER BY sort_order ASC, subscription_end ASC';
 
     const clients = await dbAll(query, params);
     res.json(clients);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/clients/reorder — сохранить новый порядок
+router.patch('/reorder', async (req, res) => {
+  try {
+    const { ids } = req.body; // массив id в нужном порядке
+    if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids must be array' });
+    for (let i = 0; i < ids.length; i++) {
+      await dbRun('UPDATE clients SET sort_order = ? WHERE id = ?', [i, ids[i]]);
+    }
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

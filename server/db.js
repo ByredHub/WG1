@@ -77,6 +77,9 @@ function initSchema() {
     if (err) { console.error('[DB] Ошибка схемы:', err.message); return; }
     // Миграции — добавить новые колонки если их нет
     db.run(`ALTER TABLE clients ADD COLUMN router_model TEXT`, () => {});
+    db.run(`ALTER TABLE clients ADD COLUMN sort_order INTEGER DEFAULT 0`, () => {});
+    // Проставить sort_order по текущему порядку если все нули
+    db.run(`UPDATE clients SET sort_order = rowid WHERE sort_order = 0 OR sort_order IS NULL`, () => {});
     console.log('[DB] База данных готова');
   });
 }
