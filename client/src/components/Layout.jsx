@@ -1,9 +1,23 @@
 import React from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, CreditCard, LogOut, Shield, MessageCircle, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, LogOut, Shield, MessageCircle, Settings, Bell } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import api from '../api.js'
 
 export default function Layout() {
   const navigate = useNavigate()
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    function fetchPending() {
+      api.get('/admin/payment-requests').then(res => {
+        setPendingCount(res.data.filter(r => r.status === 'pending').length)
+      }).catch(() => {})
+    }
+    fetchPending()
+    const t = setInterval(fetchPending, 30000)
+    return () => clearInterval(t)
+  }, [])
 
   function logout() {
     localStorage.removeItem('token')
@@ -49,6 +63,20 @@ export default function Layout() {
           >
             <Users size={18} />
             Клиенты
+          </NavLink>
+          <NavLink
+            to="/payment-requests"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`
+            }
+          >
+            <Bell size={18} />
+            Заявки
+            {pendingCount > 0 && (
+              <span className="ml-auto bg-amber-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">{pendingCount}</span>
+            )}
           </NavLink>
           <NavLink
             to="/payments"

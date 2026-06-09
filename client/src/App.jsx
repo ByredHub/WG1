@@ -8,6 +8,7 @@ import Payments from './pages/Payments.jsx'
 import Settings from './pages/Settings.jsx'
 import WhatsAppConnect from './pages/WhatsAppConnect.jsx'
 import Pay from './pages/Pay.jsx'
+import PaymentRequests from './pages/PaymentRequests.jsx'
 import Layout from './components/Layout.jsx'
 
 function PrivateRoute({ children }) {
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="payments" element={<Payments />} />
           <Route path="settings" element={<Settings />} />
           <Route path="whatsapp" element={<WhatsAppConnect />} />
+          <Route path="payment-requests" element={<PaymentRequests />} />
         </Route>
       </Routes>
     </BrowserRouter>

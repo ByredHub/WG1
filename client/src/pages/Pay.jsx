@@ -8,6 +8,9 @@ export default function Pay() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
 
   useEffect(() => {
     axios.get(`/api/pay/${token}`)
@@ -20,6 +23,19 @@ export default function Pay() {
     navigator.clipboard.writeText(data.sbpPhone)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handlePaid() {
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await axios.post(`/api/pay/${token}/request`)
+      setSubmitted(true)
+    } catch (e) {
+      setSubmitError(e.response?.data?.error || 'Ошибка отправки')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   // Генерируем СБП deeplink (Сбербанк / универсальный)
@@ -120,9 +136,30 @@ export default function Pay() {
             </div>
           )}
 
-          <p className="text-xs text-gray-400 text-center mt-5">
-            После оплаты напишите нам в WhatsApp — мы проверим и активируем VPN в течение нескольких минут.
-          </p>
+          {/* Кнопка «Я оплатил» */}
+          {submitted ? (
+            <div className="mt-5 bg-green-50 border border-green-200 rounded-xl p-5 text-center">
+              <div className="text-3xl mb-2">✅</div>
+              <p className="font-bold text-green-800 text-base">Заявка отправлена!</p>
+              <p className="text-green-700 text-sm mt-1">Мы проверим платёж и активируем VPN.<br/>Ответ придёт в WhatsApp.</p>
+            </div>
+          ) : (
+            <div className="mt-5 space-y-2">
+              <button
+                onClick={handlePaid}
+                disabled={submitting}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl py-3.5 font-bold text-base flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                {submitting ? (
+                  <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span> Отправка...</>
+                ) : (
+                  <><span>✅</span> Я оплатил</>
+                )}
+              </button>
+              {submitError && <p className="text-red-500 text-xs text-center">{submitError}</p>}
+              <p className="text-xs text-gray-400 text-center">Нажмите после перевода — мы проверим и активируем VPN</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

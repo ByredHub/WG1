@@ -11,8 +11,9 @@ const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');
 const paymentRoutes = require('./routes/payments');
 const { startScheduler, checkSubscriptions, restartScheduler } = require('./scheduler');
-const { getDb, dbRun } = require('./db');
-const { getClient, getStatus, subscribeToEvents, getLastQR, forceRestart, setIncomingMessageHandler, sendPaymentLink, formatPhone } = require('./whatsapp');
+const { getDb, dbRun, dbGet, dbAll } = require('./db');
+const { v4: uuidv4 } = require('uuid');
+const { getClient, getStatus, subscribeToEvents, getLastQR, forceRestart, setIncomingMessageHandler, sendPaymentLink, formatPhone, notifyAdminPaymentRequest, notifyClientApproved, notifyClientRejected, generatePayToken } = require('./whatsapp');
 const { router: settingsRouter, loadSettingsToEnv } = require('./routes/settings');
 
 const app = express();
@@ -56,6 +57,87 @@ app.get('/api/pay/:token', async (req, res) => {
     const sbpBank = await getSetting('sbp_bank') || '';
     const sbpName = await getSetting('sbp_name') || '';
     res.json({ client, price, sbpPhone, sbpBank, sbpName });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Клиент нажимает «Я оплатил»
+app.post('/api/pay/:token/request', async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const secret = process.env.JWT_SECRET || 'secret';
+    let payload;
+    try { payload = jwt.verify(req.params.token, secret); } catch {
+      return res.status(400).json({ error: 'Ссылка недействительна' });
+    }
+    if (payload.type !== 'pay') return res.status(400).json({ error: 'Неверный тип токена' });
+    const client = await dbGet('SELECT * FROM clients WHERE id = ?', [payload.client_id]);
+    if (!client) return res.status(404).json({ error: 'Клиент не найден' });
+
+    const { getSetting } = require('./routes/settings');
+    const amount = parseInt(await getSetting('subscription_price') || '250');
+    const id = uuidv4();
+    await dbRun(
+      'INSERT INTO payment_requests (id, client_id, amount) VALUES (?, ?, ?)',
+      [id, client.id, amount]
+    );
+    notifyAdminPaymentRequest(client, id, amount).catch(() => {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Получить список заявок
+app.get('/api/admin/payment-requests', requireAuth, async (req, res) => {
+  try {
+    const rows = await dbAll(
+      `SELECT pr.*, c.name as client_name, c.phone as client_phone
+       FROM payment_requests pr
+       JOIN clients c ON c.id = pr.client_id
+       ORDER BY pr.created_at DESC LIMIT 100`
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Принять заявку
+app.post('/api/admin/payment-requests/:id/approve', requireAuth, async (req, res) => {
+  try {
+    const pr = await dbGet('SELECT * FROM payment_requests WHERE id = ?', [req.params.id]);
+    if (!pr) return res.status(404).json({ error: 'Заявка не найдена' });
+    if (pr.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+
+    const client = await dbGet('SELECT * FROM clients WHERE id = ?', [pr.client_id]);
+    const days = 30;
+    const dayjs = require('dayjs');
+    const base = client.subscription_end && dayjs(client.subscription_end).isAfter(dayjs())
+      ? dayjs(client.subscription_end) : dayjs();
+    const newEnd = base.add(days, 'day').format('YYYY-MM-DD');
+
+    await dbRun('UPDATE clients SET subscription_end = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [newEnd, 'active', client.id]);
+    await dbRun('UPDATE payment_requests SET status = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?', ['approved', pr.id]);
+    notifyClientApproved(client, days).catch(() => {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Отклонить заявку
+app.post('/api/admin/payment-requests/:id/reject', requireAuth, async (req, res) => {
+  try {
+    const pr = await dbGet('SELECT * FROM payment_requests WHERE id = ?', [req.params.id]);
+    if (!pr) return res.status(404).json({ error: 'Заявка не найдена' });
+    if (pr.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+
+    const client = await dbGet('SELECT * FROM clients WHERE id = ?', [pr.client_id]);
+    await dbRun('UPDATE payment_requests SET status = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?', ['rejected', pr.id]);
+    notifyClientRejected(client).catch(() => {});
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

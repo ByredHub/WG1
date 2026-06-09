@@ -169,6 +169,46 @@ async function sendActivationConfirmation(client, expiryDate) {
   return await sendMessage(client.phone, message);
 }
 
+async function notifyAdminPaymentRequest(client, requestId, amount) {
+  const adminPhone = process.env.ADMIN_PHONE;
+  if (!adminPhone) return;
+  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+  const message =
+    `💰 *Новая заявка на оплату*\n\n` +
+    `👤 Клиент: *${client.name}*\n` +
+    `📱 Телефон: ${client.phone}\n` +
+    `💵 Сумма: *${amount}₽*\n\n` +
+    `Примите или отклоните в панели:\n${appUrl}/payment-requests\n\n` +
+    `Или ответьте командой:\n` +
+    `✅ *принять ${requestId.slice(0, 8)}*\n` +
+    `❌ *отклонить ${requestId.slice(0, 8)}*`;
+  return await sendMessage(adminPhone, message);
+}
+
+async function notifyClientApproved(client, days) {
+  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+  const token = generatePayToken(client.id);
+  const newEnd = require('dayjs')().add(days, 'day').format('DD.MM.YYYY');
+  const message =
+    `✅ *Оплата принята!*\n\n` +
+    `Привет, ${client.name}! Ваш платёж подтверждён.\n` +
+    `VPN активирован до *${newEnd}*.\n\n` +
+    `Спасибо! 🙏`;
+  return await sendMessage(client.phone, message);
+}
+
+async function notifyClientRejected(client) {
+  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+  const token = generatePayToken(client.id);
+  const link = `${appUrl}/pay/${token}`;
+  const message =
+    `❌ *Оплата не подтверждена*\n\n` +
+    `Привет, ${client.name}! К сожалению, мы не нашли ваш платёж.\n\n` +
+    `Пожалуйста, попробуйте оплатить снова:\n${link}\n\n` +
+    `Если возникли проблемы — напишите нам.`;
+  return await sendMessage(client.phone, message);
+}
+
 function getStatus() {
   return { ready: isReady, initialized: client !== null };
 }
@@ -180,10 +220,14 @@ module.exports = {
   sendReminderBeforeExpiry,
   sendExpiredNotification,
   sendActivationConfirmation,
+  notifyAdminPaymentRequest,
+  notifyClientApproved,
+  notifyClientRejected,
   getStatus,
   forceRestart,
   subscribeToEvents,
   getLastQR,
   setIncomingMessageHandler,
   formatPhone,
+  generatePayToken,
 };

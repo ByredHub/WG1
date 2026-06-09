@@ -62,6 +62,16 @@ function initSchema() {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS payment_requests (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      status TEXT DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      resolved_at DATETIME,
+      FOREIGN KEY (client_id) REFERENCES clients(id)
+    );
   `, (err) => {
     if (err) console.error('[DB] Ошибка схемы:', err.message);
     else console.log('[DB] База данных готова');
